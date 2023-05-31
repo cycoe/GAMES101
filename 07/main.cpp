@@ -1,9 +1,11 @@
+#include "Material.hpp"
 #include "Renderer.hpp"
 #include "Scene.hpp"
 #include "Triangle.hpp"
 #include "Sphere.hpp"
 #include "Vector.hpp"
 #include "global.hpp"
+#include "Material/Microfacet.hpp"
 #include <chrono>
 
 // In the main function of the program, we create the scene (create objects and
@@ -22,27 +24,55 @@ int main(int argc, char** argv)
     green->Kd = Vector3f(0.14f, 0.45f, 0.091f);
     Material* white = new Material(DIFFUSE, Vector3f(0.0f));
     white->Kd = Vector3f(0.725f, 0.71f, 0.68f);
-    Material* light = new Material(DIFFUSE, (8.0f * Vector3f(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * Vector3f(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *Vector3f(0.737f+0.642f,0.737f+0.159f,0.737f)));
+    Material* light = new Material(DIFFUSE, (12.0f * Vector3f(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 20.6f * Vector3f(0.740f+0.287f,0.740f+0.160f,0.740f) + 25.f *Vector3f(0.737f+0.642f,0.737f+0.159f,0.737f)));
     light->Kd = Vector3f(0.65f);
+    Material* mirror = new Material(SPECULAR, Vector3f(0.f));
+    mirror->Ks = Vector3f(0.8f, 0.8f, 0.8f);
+    Material* glass = new Material(GLASS, Vector3f(0.f));
+    glass->Ks = Vector3f(0.98f);
+    Material* glaze = new Material(GLAZE, Vector3f(0.f));
+    glaze->Ks = Vector3f(0.98f);
+    glaze->Kd = Vector3f(0.55f, 0.13f, 0.67f);
+    Material* block = new Material(BLOCK, Vector3f(0.0f));
+    block->Kd = Vector3f(0.725f, 0.71f, 0.68f);
+    Material* mf = new Material(OREN_NAYAR, Vector3f(0.0f));
+    mf->Kd = Vector3f(0.725f, 0.71f, 0.68f);
+    Vector3f R(0.725f, 0.71f, 0.68f);
+    TrowbridgeReitzDistribution td(5, 5);
+    Material* mfr = new MicrofacetReflection(R, 5, 5, td);
 
-    MeshTriangle floor("./models/cornellbox/floor.obj", white);
+    MeshTriangle floor("./models/cornellbox/floor.obj", block);
     MeshTriangle shortbox("./models/cornellbox/shortbox.obj", white);
-    MeshTriangle tallbox("./models/cornellbox/tallbox.obj", white);
+    MeshTriangle tallbox("./models/cornellbox/tallbox.obj", mirror);
     MeshTriangle left("./models/cornellbox/left.obj", red);
     MeshTriangle right("./models/cornellbox/right.obj", green);
     MeshTriangle light_("./models/cornellbox/light.obj", light);
+    MeshTriangle bunny("./models/bunny/bunny.obj", glass);
+    MeshTriangle spot("./models/spot/spot.obj", mirror);
+    MeshTriangle pane("./models/cornellbox/glass.obj", glass);
+    MeshTriangle lucy1("./models/lucy1.obj", mirror);
+    MeshTriangle lucy2("./models/lucy2.obj", mfr);
+    MeshTriangle lucy3("./models/lucy3.obj", glass);
+    Sphere sphere(Vector3f(400.f, 60.f, 140.f), 60.f, glass);
 
     scene.Add(&floor);
-    scene.Add(&shortbox);
-    scene.Add(&tallbox);
+    //scene.Add(&shortbox);
+    //scene.Add(&tallbox);
     scene.Add(&left);
     scene.Add(&right);
     scene.Add(&light_);
+    //scene.Add(&lucy1);
+    scene.Add(&lucy2);
+    //scene.Add(&lucy3);
+    //scene.Add(&bunny);
+    //scene.Add(&pane);
+    //scene.Add(&spot);
+    //scene.Add(&sphere);
 
     scene.buildBVH();
 
     Renderer r;
-    int spp = 16;
+    int spp = 1024;
     if (argc > 1)
     {
         spp = std::atoi(argv[1]);

@@ -40,8 +40,8 @@ public:
         float t0, t1;
         if (!
         solveQuadratic(a, b, c, t0, t1)) return false;
-        if (t0 < 0) t0 = t1;
-        if (t0 < 0) return false;
+        if (t0 < 0.001) t0 = t1;
+        if (t0 < 0.001) return false;
         tnear = t0;
 
         return true;
@@ -55,8 +55,8 @@ public:
         float c = dotProduct(L, L) - radius2;
         float t0, t1;
         if (!solveQuadratic(a, b, c, t0, t1)) return result;
-        if (t0 < 0) t0 = t1;
-        if (t0 < 0) return result;
+        if (t0 < 0.001) t0 = t1;
+        if (t0 < 0.001) return result;
         result.happened=true;
 
         result.coords = Vector3f(ray.origin + ray.direction * t0);

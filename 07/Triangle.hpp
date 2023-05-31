@@ -6,6 +6,7 @@
 #include "OBJ_Loader.hpp"
 #include "Object.hpp"
 #include "Triangle.hpp"
+#include "Vector.hpp"
 #include <cassert>
 #include <array>
 
@@ -108,9 +109,44 @@ public:
             std::array<Vector3f, 3> face_vertices;
 
             for (int j = 0; j < 3; j++) {
-                auto vert = Vector3f(mesh.Vertices[i + j].Position.X,
-                                     mesh.Vertices[i + j].Position.Y,
-                                     mesh.Vertices[i + j].Position.Z);
+                Vector3f vert;
+                if (filename.find("bunny") != filename.npos)
+                {
+                    vert = Vector3f(-mesh.Vertices[i + j].Position.X,
+                                    mesh.Vertices[i + j].Position.Y,
+                                    -mesh.Vertices[i + j].Position.Z);
+                    vert = 1000.f * vert + Vector3f(180.f, 130.f, 170.f);
+                }
+                else if (filename.find("lucy1") != filename.npos)
+                {
+                    vert = Vector3f(mesh.Vertices[i + j].Position.X,
+                                    mesh.Vertices[i + j].Position.Z,
+                                    -mesh.Vertices[i + j].Position.Y);
+                    vert = 0.25 * vert;
+                    vert = vert + Vector3f(250.f, 150.f, 150.f);
+                }
+                else if (filename.find("lucy2") != filename.npos)
+                {
+                    vert = Vector3f(mesh.Vertices[i + j].Position.X,
+                                    mesh.Vertices[i + j].Position.Z,
+                                    -mesh.Vertices[i + j].Position.Y);
+                    vert = 0.25 * vert;
+                    vert = vert + Vector3f(100.f, 150.f, 300.f);
+                }
+                else if (filename.find("lucy3") != filename.npos)
+                {
+                    vert = Vector3f(mesh.Vertices[i + j].Position.X,
+                                    mesh.Vertices[i + j].Position.Z,
+                                    -mesh.Vertices[i + j].Position.Y);
+                    vert = 0.25 * vert;
+                    vert = vert + Vector3f(-50.f, 150.f, 150.f);
+                }
+                else
+                {
+                    vert = Vector3f(mesh.Vertices[i + j].Position.X,
+                                    mesh.Vertices[i + j].Position.Y,
+                                    mesh.Vertices[i + j].Position.Z);
+                }
                 face_vertices[j] = vert;
 
                 min_vert = Vector3f(std::min(min_vert.x, vert.x),
@@ -194,7 +230,7 @@ public:
 
         return intersec;
     }
-    
+
     void Sample(Intersection &pos, float &pdf){
         bvh->Sample(pos, pdf);
         pos.emit = m->getEmission();
@@ -233,29 +269,29 @@ inline Intersection Triangle::getIntersection(Ray ray)
 {
 	Intersection inter;
 
-	if (dotProduct(ray.direction, normal) > 0)
-		return inter;
+	//if (dotProduct(ray.direction, normal) > 0)
+    //    return inter;
 	double u, v, t_tmp = 0;
 	Vector3f pvec = crossProduct(ray.direction, e2);
 	double det = dotProduct(e1, pvec);
 	if (fabs(det) < EPSILON)
-		return inter;
+      return inter;
 
 	double det_inv = 1. / det;
 	Vector3f tvec = ray.origin - v0;
 	u = dotProduct(tvec, pvec) * det_inv;
 	if (u < 0 || u > 1)
-		return inter;
+      return inter;
 	Vector3f qvec = crossProduct(tvec, e1);
 	v = dotProduct(ray.direction, qvec) * det_inv;
 	if (v < 0 || u + v > 1)
-		return inter;
+      return inter;
 	t_tmp = dotProduct(e2, qvec) * det_inv;
 
 	// TODO find ray triangle intersection
 
 	if (t_tmp <= 0)
-		return inter;
+      return inter;
 
 	inter.happened = true;
 	inter.coords = ray(t_tmp);
