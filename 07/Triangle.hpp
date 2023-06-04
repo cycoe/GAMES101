@@ -141,6 +141,14 @@ public:
                     vert = 0.25 * vert;
                     vert = vert + Vector3f(-50.f, 150.f, 150.f);
                 }
+                else if (filename.find("dragon") != filename.npos)
+                {
+                    vert = Vector3f(mesh.Vertices[i + j].Position.X,
+                                    mesh.Vertices[i + j].Position.Y,
+                                    mesh.Vertices[i + j].Position.Z);
+                    vert = 2 * vert;
+                    vert = vert + Vector3f(250.f, 80.f, 250.f);
+                }
                 else
                 {
                     vert = Vector3f(mesh.Vertices[i + j].Position.X,

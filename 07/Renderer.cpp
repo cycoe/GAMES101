@@ -6,6 +6,7 @@
 #include <thread>
 #include "Scene.hpp"
 #include "Renderer.hpp"
+#include "Vector.hpp"
 #include <mutex>
 #include <vector>
 
@@ -20,7 +21,11 @@ void render_thread(std::vector<Vector3f>& fbuffer, const Scene& scene,int spp, i
 {
 	float scale = tan(deg2rad(scene.fov * 0.5));
 	float imageAspectRatio = scene.width / (float)scene.height;
-	Vector3f eye_pos(278, 273, -800);
+	//Vector3f eye_pos(278, 273, -800);
+	Vector3f eye_pos(278, 500, -500);
+	Vector3f front = Vector3f(0, -500, 1000).normalized();
+	Vector3f up = Vector3f(0, 1000, 500).normalized();
+	Vector3f right = crossProduct(front, up);
     float r = 10.f;
     float fl = 950;
 	for (int i = y0; i < y1; i++)
@@ -37,9 +42,10 @@ void render_thread(std::vector<Vector3f>& fbuffer, const Scene& scene,int spp, i
 				float _x = (2 * (j + x) / (float)scene.width - 1) *
 					imageAspectRatio * scale;
 				float _y = (1 - 2 * (i + y) / (float)scene.height) * scale;
-				Vector3f dir = normalize(Vector3f(-_x, _y, 1));
+				//Vector3f dir = normalize(Vector3f(-_x, _y, 1));
                 //Vector3f fr = Vector3f(eye_pos.x + fx, eye_pos.y + fy, eye_pos.z);
                 //Vector3f fp = eye_pos + fl * dir;
+				Vector3f dir = normalize(front + _x * right + _y * up);
 				Ray ray = Ray(eye_pos, dir);
 				//Ray ray = Ray(fr, (fp - fr).normalized());
 				fbuffer[index] += scene.castRay(ray, 0) / spp;

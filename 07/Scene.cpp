@@ -101,6 +101,7 @@ Vector3f Scene::shade(Intersection& hit_obj, Vector3f wo, int depth) const
 		{
 			Vector3f dir2NextObj = hit_obj.m->sample(wo, hit_obj.normal).normalized();
             float pdf = hit_obj.m->pdf(wo, dir2NextObj, hit_obj.normal);
+            //std::cout << "pdf in scene " << pdf << std::endl;
             if (pdf > epsilon)
             {
                 Intersection nextObj = intersect(Ray(hit_obj.coords, dir2NextObj));
@@ -113,7 +114,7 @@ Vector3f Scene::shade(Intersection& hit_obj, Vector3f wo, int depth) const
                     Vector3f decay(1.f);
                     if (dotProduct(hit_obj.normal, dir2NextObj) < 0.f &&
                         dotProduct(nextObj.normal, dir2NextObj) > 0.f) {
-                      Vector3f absorb(0.003, 0.01, 0.002);
+                      Vector3f absorb(0.01, 0.002, 0.003);
                       float distance = (nextObj.coords - hit_obj.coords).norm();
                       Vector3f coff = -distance * absorb;
                       decay = Vector3f(std::exp(coff.x), std::exp(coff.y), std::exp(coff.z));
