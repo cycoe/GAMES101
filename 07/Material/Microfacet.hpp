@@ -6,6 +6,8 @@
 #include "../Material.hpp"
 #include <cmath>
 #include <cstdlib>
+#include <iostream>
+#include <random>
 
 inline Vector3f local_to_world(Vector3f const& wh, Vector3f const& N, Vector3f const& X, Vector3f const& Y) {
   return wh.x * X + wh.y * Y + wh.z * N;
@@ -36,6 +38,7 @@ struct MicrofacetReflection : public Material {
   // given a ray, calculate the contribution of this ray
   virtual Vector3f eval(const Vector3f &coords, const Vector3f &wi,
                        const Vector3f &wo, const Vector3f &N) override;
+  virtual MaterialType getType() override { return GXX; };
 
   Vector3f m_R;
   float m_alpha_x;
@@ -53,7 +56,7 @@ float TrowbridgeReitzDistribution::D(const Vector3f &wh, Vector3f const& N) cons
 
   Vector3f x, y;
   if (std::abs(m_alpha_x - m_alpha_y) < 0.001f) {
-    float e = 1 + tan_theta_2;
+    float e = 1 + tan_theta_2 / (m_alpha_x * m_alpha_y);
     return 1.f / (M_PI * m_alpha_x * m_alpha_x * cos_theta_2 * cos_theta_2 * e * e);
   } else {
     return 0.f;
@@ -73,7 +76,7 @@ float TrowbridgeReitzDistribution::Lambda(const Vector3f &w, Vector3f const& N) 
   if (std::isinf(tan_theta_2)) return 0.f;
 
   if (std::abs(m_alpha_x - m_alpha_y) < 0.001f) {
-    float alpha_tan_theta_2 = m_alpha_x * m_alpha_x * tan_theta_2;
+    float alpha_tan_theta_2 = m_alpha_x * m_alpha_y * tan_theta_2;
     return (-1 + std::sqrt(1.f + alpha_tan_theta_2)) / 2;
   } else {
     return 0.f;
@@ -90,7 +93,7 @@ Vector3f MicrofacetReflection::sample(const Vector3f &wi, const Vector3f &N) {
   float phi = 2 * M_PI * ksi_1;
   float tan_theta_2 = ksi_2 * m_alpha_x * m_alpha_y / (1 - ksi_2);
   float cos_theta = 1 / std::sqrt(1 + tan_theta_2);
-  float sin_theta = std::sqrt(std::abs(1 - cos_theta * cos_theta));
+  float sin_theta = std::sqrt(1 - cos_theta * cos_theta);
   Vector3f wh(sin_theta * std::cos(phi), sin_theta * std::sin(phi), cos_theta);
 
   Vector3f X;
@@ -105,27 +108,37 @@ Vector3f MicrofacetReflection::sample(const Vector3f &wi, const Vector3f &N) {
     X = crossProduct(Y, N);
   }
 
-  wh = local_to_world(wh, N, X, Y);
+  wh = local_to_world(wh, N, X, Y).normalized();
   return 2 * dotProduct(wh, wi) * wh - wi;
 }
 
 float MicrofacetReflection::pdf(const Vector3f &wi, const Vector3f &wo, const Vector3f &N) {
   Vector3f wh = (wi + wo).normalized();
   float cos_theta = dotProduct(wh, N);
+  if (cos_theta < 0.001f) return 0.f;
   float cos_theta_2 = cos_theta * cos_theta;
   float sin_theta_2 = 1 - cos_theta_2;
   float tan_theta_2 = sin_theta_2 / cos_theta_2;
-  float tan_theta = std::sqrt(tan_theta_2);
-  float e = 1 + tan_theta_2 * tan_theta / (m_alpha_x * m_alpha_y);
-  return tan_theta / (m_alpha_x * m_alpha_y * cos_theta_2 * e * e);
+  float e = 1 + tan_theta_2 / (m_alpha_x * m_alpha_y);
+  float pdf = 1 / (M_PI * m_alpha_x * m_alpha_y * cos_theta * cos_theta_2 * e * e);
+  return pdf;
 }
 
 Vector3f MicrofacetReflection::eval(const Vector3f &coords, const Vector3f &wi, const Vector3f &wo, const Vector3f &N) {
   float cos_theta_i = std::abs(dotProduct(wi, N));
   float cos_theta_o = std::abs(dotProduct(wo, N));
-  Vector3f wh = (wi + wo).normalized();
+  Vector3f wh = wi + wo;
 
-  return m_distribution.D(wh, N) * m_distribution.G(wo, wi, N) / (4 * cos_theta_i * cos_theta_o);
+  if (cos_theta_i < 0.001f || cos_theta_o <  0.001f) return Vector3f(0.f);
+  if (wh.norm() < 0.001f) return Vector3f(0.f);
+
+  wh = wh.normalized();
+  float d = m_distribution.D(wh, N);
+  float g = m_distribution.G(wo, wi, N);
+  float f = 0.98f;
+  Vector3f R = d * g * f / (4 * cos_theta_i * cos_theta_o) * m_R;
+
+  return R;
 }
 
 #endif  // __RAY_TRAING_MICROFACET_HPP__

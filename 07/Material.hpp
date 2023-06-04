@@ -14,7 +14,8 @@ enum MaterialType {
     GLASS,
     GLAZE,
     BLOCK,
-    OREN_NAYAR
+    OREN_NAYAR,
+    GXX
 };
 
 class Material{
@@ -103,7 +104,7 @@ public:
     //Texture tex;
 
     inline Material(MaterialType t=DIFFUSE, Vector3f e=Vector3f(0,0,0));
-    inline MaterialType getType();
+    inline virtual MaterialType getType();
     //inline Vector3f getColor();
     inline Vector3f getColorAt(double u, double v);
     inline Vector3f getEmission();
