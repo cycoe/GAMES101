@@ -3,6 +3,8 @@
 //
 
 #include "Scene.hpp"
+#include "Material.hpp"
+#include "Vector.hpp"
 #include <cassert>
 
 void Scene::buildBVH() {
@@ -68,6 +70,21 @@ Vector3f Scene::shade(Intersection& hit_obj, Vector3f wo, int depth) const
         return hit_obj.m->getEmission();
     }
 
+    Vector3f x, y;
+    Vector3f z = hit_obj.normal;
+    if (std::fabs(z.x) > std::fabs(z.y)){
+        float invLen = 1.0f / std::sqrt(z.x * z.x + z.z * z.z);
+        x = Vector3f(z.z * invLen, 0.0f, -z.x *invLen);
+        y = crossProduct(z, x);
+    }
+    else {
+        float invLen = 1.0f / std::sqrt(z.y * z.y + z.z * z.z);
+        y = Vector3f(0.0f, z.z * invLen, -z.y *invLen);
+        x = crossProduct(y, z);
+    }
+
+    Vector3f local_wo = world_to_local(wo, x, y, z);
+
     const float epsilon = 0.0005f;
     // 直接光照贡献
     Vector3f Lo_dir;
@@ -77,12 +94,13 @@ Vector3f Scene::shade(Intersection& hit_obj, Vector3f wo, int depth) const
 		sampleLight(hit_light, light_pdf);
 		Vector3f obj2Light = hit_light.coords - hit_obj.coords;
         Vector3f obj2LightDir = obj2Light.normalized();
+        Vector3f local_obj2light = world_to_local(obj2LightDir, x, y, z);
 
         // 检查光线是否被遮挡
         auto t = intersect(Ray(hit_obj.coords, obj2LightDir));
         if (t.distance - obj2Light.norm() > -epsilon)
         {
-          Vector3f f_r = hit_obj.m->eval(hit_obj.coords, obj2LightDir, wo, hit_obj.normal);
+          Vector3f f_r = hit_obj.m->eval(hit_obj.coords, local_obj2light, local_wo);
           float r2 = dotProduct(obj2Light, obj2Light);
           float cosA = std::abs(dotProduct(hit_obj.normal,obj2LightDir));
           if (hit_obj.m->getType() == SPECULAR || hit_obj.m->getType() == GLASS)
@@ -99,15 +117,16 @@ Vector3f Scene::shade(Intersection& hit_obj, Vector3f wo, int depth) const
     {
 		if (get_random_float() < RussianRoulette)
 		{
-			Vector3f dir2NextObj = hit_obj.m->sample(wo, hit_obj.normal).normalized();
-            float pdf = hit_obj.m->pdf(wo, dir2NextObj, hit_obj.normal);
+			Vector3f local_wi = hit_obj.m->sample(local_wo).normalized();
+            float pdf = hit_obj.m->pdf(local_wo, local_wi);
             //std::cout << "pdf in scene " << pdf << std::endl;
             if (pdf > epsilon)
             {
+                Vector3f dir2NextObj = local_to_world(local_wi, x, y, z);
                 Intersection nextObj = intersect(Ray(hit_obj.coords, dir2NextObj));
 				if (nextObj.happened && !nextObj.m->hasEmission())
 				{
-                  Vector3f f_r = hit_obj.m->eval(hit_obj.coords, dir2NextObj, wo, hit_obj.normal); //BRDF
+                  Vector3f f_r = hit_obj.m->eval(hit_obj.coords, local_wi, local_wo); //BRDF
                   float cos = std::abs(dotProduct(dir2NextObj, hit_obj.normal));
                   if (hit_obj.m->getType() == SPECULAR || hit_obj.m->getType() == GLASS)
 						cos = 1.f;

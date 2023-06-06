@@ -85,6 +85,7 @@ float TrowbridgeReitzDistribution::Lambda(const Vector3f &w, Vector3f const& N) 
 
 float TrowbridgeReitzDistribution::G(const Vector3f &wo, const Vector3f &wi, Vector3f const& N) const {
   return 1 / (1 + Lambda(wo, N) + Lambda(wi, N));
+  //return G1(wo, N) * G1(wi, N);
 }
 
 Vector3f MicrofacetReflection::sample(const Vector3f &wi, const Vector3f &N) {

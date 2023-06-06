@@ -5,7 +5,6 @@
 #include "Sphere.hpp"
 #include "Vector.hpp"
 #include "global.hpp"
-#include "Material/Microfacet.hpp"
 #include <chrono>
 
 // In the main function of the program, we create the scene (create objects and
@@ -37,29 +36,29 @@ int main(int argc, char** argv)
     block->Kd = Vector3f(0.725f, 0.71f, 0.68f);
     Material* mf = new Material(OREN_NAYAR, Vector3f(0.0f));
     mf->Kd = Vector3f(0.725f, 0.71f, 0.68f);
-    Vector3f R(1.f, 1.f, 1.f);
-    TrowbridgeReitzDistribution td(0.1, 0.1);
-    Material* mfr = new MicrofacetReflection(R, 0.1, 0.1, td);
-    //Vector3f R2(0.7f, 0.95f, 0.85f);
-    Vector3f R2(1.f, 0.84f, 0.f);
-    TrowbridgeReitzDistribution td2(0.2, 0.2);
-    Material* mfr2 = new MicrofacetReflection(R2, 0.2, 0.2, td2);
+    //Vector3f R(1.f, 1.f, 1.f);
+    //TrowbridgeReitzDistribution td(0.1, 0.1);
+    //Material* mfr = new MicrofacetReflection(R, 0.1, 0.1, td);
+    ////Vector3f R2(0.7f, 0.95f, 0.85f);
+    //Vector3f R2(1.f, 0.84f, 0.f);
+    //TrowbridgeReitzDistribution td2(0.2, 0.2);
+    //Material* mfr2 = new MicrofacetReflection(R2, 0.2, 0.2, td2);
 
-    MeshTriangle floor("./models/cornellbox/floor.obj", mfr);
+    MeshTriangle floor("./models/cornellbox/floor.obj", white);
     MeshTriangle shortbox("./models/cornellbox/shortbox.obj", white);
     MeshTriangle tallbox("./models/cornellbox/tallbox.obj", mirror);
-    MeshTriangle left("./models/cornellbox/left.obj", mfr);
-    MeshTriangle right("./models/cornellbox/right.obj", mfr);
+    MeshTriangle left("./models/cornellbox/left.obj", red);
+    MeshTriangle right("./models/cornellbox/right.obj", green);
     MeshTriangle light_("./models/cornellbox/light.obj", light);
     MeshTriangle bunny("./models/bunny/bunny.obj", glass);
     MeshTriangle spot("./models/spot/spot.obj", mirror);
     MeshTriangle pane("./models/cornellbox/glass.obj", glass);
-    MeshTriangle lucy1("./models/lucy1.obj", mfr);
-    MeshTriangle lucy2("./models/lucy2.obj", mf);
-    MeshTriangle lucy3("./models/lucy3.obj", glass);
-    MeshTriangle dragon("./models/xyzrgb_dragon.obj", mfr2);
-    Sphere sphere1(Vector3f(350.f, 60.f, 300.f), 60.f, mirror);
-    Sphere sphere2(Vector3f(150.f, 60.f, 300.f), 60.f, mfr);
+    //MeshTriangle lucy1("./models/lucy1.obj", mfr);
+    //MeshTriangle lucy2("./models/lucy2.obj", mf);
+    //MeshTriangle lucy3("./models/lucy3.obj", glass);
+    //MeshTriangle dragon("./models/xyzrgb_dragon.obj", mfr2);
+    Sphere sphere1(Vector3f(350.f, 60.f, 300.f), 60.f, white);
+    //Sphere sphere2(Vector3f(150.f, 60.f, 300.f), 60.f, mfr);
 
     scene.Add(&floor);
     //scene.Add(&shortbox);
@@ -73,9 +72,9 @@ int main(int argc, char** argv)
     //scene.Add(&bunny);
     //scene.Add(&pane);
     //scene.Add(&spot);
-    //scene.Add(&sphere1);
+    scene.Add(&sphere1);
     //scene.Add(&sphere2);
-    scene.Add(&dragon);
+    //scene.Add(&dragon);
 
     scene.buildBVH();
 

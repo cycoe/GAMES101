@@ -8,6 +8,27 @@
 #include "Vector.hpp"
 #include "global.hpp"
 
+inline Vector3f local_to_world(Vector3f const& v, Vector3f const& x, Vector3f const& y, Vector3f const& z) {
+  return v.x * x + v.y * y + v.z * z;
+}
+
+inline Vector3f world_to_local(Vector3f const& v, Vector3f const& x, Vector3f const& y, Vector3f const& z) {
+  float c11 = y.y * z.z - y.z * z.y;
+  float c12 = x.z * z.y - x.y * z.z;
+  float c13 = x.y * y.z - x.z * y.y;
+  float c21 = y.z * z.x - y.x * z.z;
+  float c22 = x.x * z.z - x.z * z.x;
+  float c23 = x.z * y.x - x.x * y.z;
+  float c31 = y.x * z.y - y.y * z.x;
+  float c32 = x.y * z.x - x.x * z.y;
+  float c33 = x.x * y.y - x.y * y.x;
+  float det_inv = 1.f / (x.x * c11 - y.x * c12 + z.x * c13);
+  float x_ = (v.x * c11 + v.y * c21 + v.z * c31) * det_inv;
+  float y_ = (v.x * c12 + v.y * c22 + v.z * c32) * det_inv;
+  float z_ = (v.x * c13 + v.y * c23 + v.z * c33) * det_inv;
+  return Vector3f(x_, y_, z_);
+}
+
 enum MaterialType {
     DIFFUSE,
     SPECULAR,
@@ -111,11 +132,11 @@ public:
     inline bool hasEmission();
 
     // sample a ray by Material properties
-    inline virtual Vector3f sample(const Vector3f &wi, const Vector3f &N);
+    inline virtual Vector3f sample(const Vector3f &wi);
     // given a ray, calculate the PdF of this ray
-    inline virtual float pdf(const Vector3f &wi, const Vector3f &wo, const Vector3f &N);
+    inline virtual float pdf(const Vector3f &wi, const Vector3f &wo);
     // given a ray, calculate the contribution of this ray
-    inline virtual Vector3f eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo, const Vector3f &N);
+    inline virtual Vector3f eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo);
 
 };
 
@@ -138,7 +159,7 @@ Vector3f Material::getColorAt(double u, double v) {
 }
 
 
-Vector3f Material::sample(const Vector3f &wi, const Vector3f &N){
+Vector3f Material::sample(const Vector3f &wi){
     switch(m_type){
         case DIFFUSE:
         case BLOCK:
@@ -149,55 +170,28 @@ Vector3f Material::sample(const Vector3f &wi, const Vector3f &N){
             float z = std::fabs(1.0f - 2.0f * x_1);
             float r = std::sqrt(1.0f - z * z), phi = 2 * M_PI * x_2;
             Vector3f localRay(r*std::cos(phi), r*std::sin(phi), z);
-            return toWorld(localRay, N);
+            return localRay;
 
             break;
         }
         case SPECULAR:
         {
-            return reflect(-wi, N);
+            return Vector3f(0.f);
         }
         case GLASS:
         {
-          float ior = 1.5f;
-          Vector3f wr = reflect(-wi, N);
-            Vector3f wt = refract(-wi, N, ior);
-            float kr = 0.f;
-            fresnel(-wi, N, ior, kr);
-
-            Vector3f wo = get_random_float() > kr ? wt : wr;
-            return wo;
+          return Vector3f(0.f);
         }
-		case GLAZE:
-		{
-            float ior = 1.5f;
-            Vector3f wr = reflect(-wi, N);
-            float kr = 0.f;
-            fresnel(-wi, N, ior, kr);
-			float kt = (1 - kr) / M_PI;
-
-			float x = get_random_float() * (kr + kt);
-			if (x < kr) {
-                return wr;
-			} else {
-                // uniform sample on the hemisphere
-                float x_1 = get_random_float(), x_2 = get_random_float();
-                float z = std::fabs(1.0f - 2.0f * x_1);
-                float r = std::sqrt(1.0f - z * z), phi = 2 * M_PI * x_2;
-                Vector3f localRay(r*std::cos(phi), r*std::sin(phi), z);
-                return toWorld(localRay, N);
-			}
-		}
     }
 }
 
-float Material::pdf(const Vector3f &wi, const Vector3f &wo, const Vector3f &N){
+float Material::pdf(const Vector3f &wi, const Vector3f &wo){
   switch(m_type){
   case DIFFUSE:
   case BLOCK:
   case OREN_NAYAR: {
     // uniform sample probability 1 / (2 * PI)
-    if (dotProduct(wo, N) > 0.0f)
+    if (wo.z > 0.f)
       return 0.5f / M_PI;
     else
       return 0.0f;
@@ -205,55 +199,17 @@ float Material::pdf(const Vector3f &wi, const Vector3f &wo, const Vector3f &N){
   }
   case SPECULAR:
     {
-      return dotProduct(wo, N) > 0.0f ? 1.f : 0.f;
-      break;
-        }
-        case GLASS:
-        {
-          float ior = 1.5f;
-          Vector3f wr = reflect(-wi, N);
-          Vector3f wt = refract(-wi, N, ior);
-          float kr = 0.f;
-          fresnel(-wi, N, ior, kr);
-
-          // std::cout << "get wo " << wo.x << "," << wo.y << "," << wo.z << std::endl;
-          if (dotProduct(wo, wr) > 0.999)
-            {
-                return kr;
-            }
-            else if (dotProduct(wo, wt) > 0.999)
-            {
-                return 1 - kr;
-            }
-            else
-            {
-                return 0.f;
-            }
-        }
-		case GLAZE:
-		{
-            float ior = 1.5f;
-            Vector3f wr = reflect(-wi, N);
-            float kr = 0.f;
-            fresnel(-wi, N, ior, kr);
-			float kt = (1 - kr) / M_PI;
-
-			if (dotProduct(wo, wr) > 0.99f) {
-                return kr / (kr + kt);
-			} else {
-				return 0.5f * kt / (kr + kt) / M_PI;
-			}
-		}
+      return 0.f;
+      }
     }
 }
 
-Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo, const Vector3f &N){
+Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo){
   switch(m_type){
   case DIFFUSE:
     {
       // calculate the contribution of diffuse   model
-      float cosalpha = dotProduct(N, wo);
-      if (cosalpha > 0.0f) {
+      if (wo.z > 0.0f) {
         Vector3f diffuse = Kd / M_PI;
               return diffuse;
       }
@@ -261,93 +217,78 @@ Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector
                 return Vector3f(0.0f);
             break;
         }
-        case BLOCK:
-          {
-            // calculate the contribution of diffuse   model
-            float cosalpha = dotProduct(N, wo);
-            if (cosalpha > 0.0f) {
-                Vector3f diffuse = Kd / M_PI;
-                if (coords.y < 0.001 &&
-                    (coords.x - (int)(coords.x / 22) * 22 > 20.f ||
-                     coords.z - (int)(coords.z / 22) * 22 > 20.f))
-                  diffuse = 0.1 * diffuse;
-                return diffuse;
-            }
-            else
-                return Vector3f(0.0f);
-            break;
-        }
-        case SPECULAR:
-        {
-	    Vector3f wr = reflect(-wo, N);
-	    if (dotProduct(wr, wi) > 0.99) {
-                return Ks;
-	    } else {
-                return Vector3f(0.f);
-	    }
-        }
-        case GLASS:
-        {
-          float ior = 1.5f;
-          Vector3f wr = reflect(-wo, N);
-          Vector3f wt = refract(-wo, N, ior);
-          float kr = 0.f;
-          fresnel(-wi, N, ior, kr);
+        // case BLOCK:
+        //   {
+        //     // calculate the contribution of diffuse   model
+        //     float cosalpha = dotProduct(N, wo);
+        //     if (cosalpha > 0.0f) {
+        //         Vector3f diffuse = Kd / M_PI;
+        //         if (coords.y < 0.001 &&
+        //             (coords.x - (int)(coords.x / 22) * 22 > 20.f ||
+        //              coords.z - (int)(coords.z / 22) * 22 > 20.f))
+        //           diffuse = 0.1 * diffuse;
+        //         return diffuse;
+        //     }
+        //     else
+        //         return Vector3f(0.0f);
+        //     break;
+        // }
+      //   case SPECULAR:
+      //   {
+	    // Vector3f wr = reflect(-wo, N);
+	    // if (dotProduct(wr, wi) > 0.99) {
+      //           return Ks;
+	    // } else {
+      //           return Vector3f(0.f);
+	    // }
+      //   }
+      //   case GLASS:
+      //   {
+      //     float ior = 1.5f;
+      //     Vector3f wr = reflect(-wo, N);
+      //     Vector3f wt = refract(-wo, N, ior);
+      //     float kr = 0.f;
+      //     fresnel(-wi, N, ior, kr);
 
-          if (dotProduct(wi, wr) > 0.99f) {
-            return kr * Ks;
-          } else if (dotProduct(wi, wt) > 0.99f) {
-            return (1 - kr) * Ks;
-          } else {
-              return Vector3f(0.f);
-            }
-        }
-		case GLAZE:
-		{
-            float ior = 1.5f;
-            Vector3f wr = reflect(-wi, N);
-            float kr = 0.f;
-            fresnel(-wi, N, ior, kr);
-			float kt = (1 - kr) / M_PI;
-
-			if (dotProduct(wr, wo) > 0.99f) {
-                return kr * Ks;
-			} else if (dotProduct(wo, N) > 0.f) {
-                return kt * Kd;
-			} else {
-                return Vector3f(0.f);
-			}
-		}
+      //     if (dotProduct(wi, wr) > 0.99f) {
+      //       return kr * Ks;
+      //     } else if (dotProduct(wi, wt) > 0.99f) {
+      //       return (1 - kr) * Ks;
+      //     } else {
+      //         return Vector3f(0.f);
+      //       }
+      //   }
     case OREN_NAYAR:
     {
-      float sigma = 20.f;
-      //sigma = sigma * M_PI / 180.f;
-      float sigma2 = sigma * sigma;
-      float A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
-      float B = 0.45f * sigma2 / (sigma2 + 0.09f);
+      return Vector3f(0.f);
+      //float sigma = 20.f;
+      ////sigma = sigma * M_PI / 180.f;
+      //float sigma2 = sigma * sigma;
+      //float A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
+      //float B = 0.45f * sigma2 / (sigma2 + 0.09f);
 
-      float cos_theta_i = dotProduct(wi, N);
-      float cos_theta_o = dotProduct(wo, N);
-      float sin_theta_i = std::sqrt(1 - cos_theta_i * cos_theta_i);
-      float sin_theta_o = std::sqrt(1 - cos_theta_o * cos_theta_o);
+      //float cos_theta_i = dotProduct(wi, N);
+      //float cos_theta_o = dotProduct(wo, N);
+      //float sin_theta_i = std::sqrt(1 - cos_theta_i * cos_theta_i);
+      //float sin_theta_o = std::sqrt(1 - cos_theta_o * cos_theta_o);
 
-      float max_cos = 0;
-      if (sin_theta_i > 1e-4 && sin_theta_o > 1e-4) {
-        Vector3f phi_i = (wi - cos_theta_i * N).normalized();
-        Vector3f phi_o = (wo - cos_theta_o * N).normalized();
-        max_cos = std::max(0.f, dotProduct(-phi_i, phi_o));
-      }
+      //float max_cos = 0;
+      //if (sin_theta_i > 1e-4 && sin_theta_o > 1e-4) {
+      //  Vector3f phi_i = (wi - cos_theta_i * N).normalized();
+      //  Vector3f phi_o = (wo - cos_theta_o * N).normalized();
+      //  max_cos = std::max(0.f, dotProduct(-phi_i, phi_o));
+      //}
 
-      float sin_alpha, tan_beta;
-      if (std::abs(cos_theta_i) > std::abs(cos_theta_o)) {
-        sin_alpha = sin_theta_o;
-        tan_beta = sin_theta_i / std::abs(cos_theta_i);
-      } else {
-        sin_alpha = sin_theta_i;
-        tan_beta = sin_theta_o / std::abs(cos_theta_o);
-      }
+      //float sin_alpha, tan_beta;
+      //if (std::abs(cos_theta_i) > std::abs(cos_theta_o)) {
+      //  sin_alpha = sin_theta_o;
+      //  tan_beta = sin_theta_i / std::abs(cos_theta_i);
+      //} else {
+      //  sin_alpha = sin_theta_i;
+      //  tan_beta = sin_theta_o / std::abs(cos_theta_o);
+      //}
 
-      return (A + B * max_cos * sin_alpha * tan_beta) / M_PI * Kd;
+      //return (A + B * max_cos * sin_alpha * tan_beta) / M_PI * Kd;
     }
     }
 
