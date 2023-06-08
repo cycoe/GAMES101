@@ -26,8 +26,8 @@ void render_thread(std::vector<Vector3f>& fbuffer, const Scene& scene,int spp, i
 	Vector3f front = Vector3f(0, -500, 1000).normalized();
 	Vector3f up = Vector3f(0, 1000, 500).normalized();
 	Vector3f right = crossProduct(front, up);
-    float r = 10.f;
-    float fl = 950;
+    float r = 20.f;
+    float fl = 850;
 	for (int i = y0; i < y1; i++)
 	{
 		for (int j = 0; j < scene.width; j++)
@@ -42,12 +42,11 @@ void render_thread(std::vector<Vector3f>& fbuffer, const Scene& scene,int spp, i
 				float _x = (2 * (j + x) / (float)scene.width - 1) *
 					imageAspectRatio * scale;
 				float _y = (1 - 2 * (i + y) / (float)scene.height) * scale;
-				//Vector3f dir = normalize(Vector3f(-_x, _y, 1));
-                //Vector3f fr = Vector3f(eye_pos.x + fx, eye_pos.y + fy, eye_pos.z);
-                //Vector3f fp = eye_pos + fl * dir;
 				Vector3f dir = normalize(front + _x * right + _y * up);
-				Ray ray = Ray(eye_pos, dir);
-				//Ray ray = Ray(fr, (fp - fr).normalized());
+				Vector3f fr = eye_pos + fx * right + fy * up;
+				Vector3f fp = eye_pos + fl * dir;
+				//Ray ray = Ray(eye_pos, dir);
+				Ray ray = Ray(fr, (fp - fr).normalized());
 				fbuffer[index] += scene.castRay(ray, 0) / spp;
 			}
 		}

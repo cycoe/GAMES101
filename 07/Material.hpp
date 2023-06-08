@@ -22,7 +22,7 @@ inline Vector3f world_to_local(Vector3f const& v, Vector3f const& x, Vector3f co
   float c31 = y.x * z.y - y.y * z.x;
   float c32 = x.y * z.x - x.x * z.y;
   float c33 = x.x * y.y - x.y * y.x;
-  float det_inv = 1.f / (x.x * c11 - y.x * c12 + z.x * c13);
+  float det_inv = 1.f / (x.x * c11 + y.x * c12 + z.x * c13);
   float x_ = (v.x * c11 + v.y * c21 + v.z * c31) * det_inv;
   float y_ = (v.x * c12 + v.y * c22 + v.z * c32) * det_inv;
   float z_ = (v.x * c13 + v.y * c23 + v.z * c33) * det_inv;
@@ -176,7 +176,7 @@ Vector3f Material::sample(const Vector3f &wi){
         }
         case SPECULAR:
         {
-            return Vector3f(0.f);
+            return Vector3f(-wi.x, -wi.y, wi.z);
         }
         case GLASS:
         {
@@ -197,11 +197,11 @@ float Material::pdf(const Vector3f &wi, const Vector3f &wo){
       return 0.0f;
     break;
   }
-  case SPECULAR:
-    {
-      return 0.f;
-      }
-    }
+  case SPECULAR: {
+    Vector3f wr(-wi.x, -wi.y, wi.z);
+    return dotProduct(wr, wo) > 0.999f ? 1.f : 0.f;
+  }
+  }
 }
 
 Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo){
@@ -233,15 +233,11 @@ Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector
         //         return Vector3f(0.0f);
         //     break;
         // }
-      //   case SPECULAR:
-      //   {
-	    // Vector3f wr = reflect(-wo, N);
-	    // if (dotProduct(wr, wi) > 0.99) {
-      //           return Ks;
-	    // } else {
-      //           return Vector3f(0.f);
-	    // }
-      //   }
+        case SPECULAR:
+        {
+          Vector3f wr(-wi.x, -wi.y, wi.z);
+          return dotProduct(wr, wo) > 0.999f ? Ks : Vector3f(0.f);
+        }
       //   case GLASS:
       //   {
       //     float ior = 1.5f;
