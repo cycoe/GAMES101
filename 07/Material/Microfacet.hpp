@@ -9,6 +9,32 @@
 #include <iostream>
 #include <random>
 
+inline float get_cos_theta(Vector3f const& w) {
+    return w.z;
+}
+
+inline float get_cos_theta_2(Vector3f const& w) {
+    return w.z * w.z;
+}
+
+inline float get_sin_theta_2(Vector3f const& w) {
+    return std::max(0.f, 1.f - get_cos_theta_2(w));
+}
+
+inline float get_sin_theta(Vector3f const& w) {
+    return std::sqrt(get_sin_theta_2(w));
+}
+
+inline float get_cos_phi(Vector3f const& w) {
+    float sin_theta = get_sin_theta(w);
+    return (sin_theta == 0) ? 1.f : clamp(-1.f, 1.f, w.x / sin_theta);
+}
+
+inline float get_sin_phi(Vector3f const& w) {
+    float sin_theta = get_sin_theta(w);
+    return (sin_theta == 0) ? 0.f : clamp(-1.f, 1.f, w.y / sin_theta);
+}
+
 struct TrowbridgeReitzDistribution {
   TrowbridgeReitzDistribution(float alpha_x, float alpha_y)
     : m_alpha_x(alpha_x), m_alpha_y(alpha_y) { }
@@ -52,9 +78,14 @@ float TrowbridgeReitzDistribution::D(const Vector3f &wh) const {
 
   if (std::abs(m_alpha_x - m_alpha_y) < 0.001f) {
     float e = 1 + tan_theta_2 / (m_alpha_x * m_alpha_y);
-    return 1.f / (M_PI * m_alpha_x * m_alpha_x * cos_theta_2 * cos_theta_2 * e * e);
+    return 1.f / (M_PI * m_alpha_x * m_alpha_y * cos_theta_2 * cos_theta_2 * e * e);
   } else {
-    return 0.f;
+    float cos_phi = get_cos_phi(wh);
+    float cos_phi_2 = cos_phi * cos_phi;
+    float sin_phi_2 = 1 - cos_phi_2;
+    float e = 1 + tan_theta_2 * (cos_phi_2 / (m_alpha_x * m_alpha_x) +
+                                 sin_phi_2 / (m_alpha_y * m_alpha_y));
+    return 1.f / (M_PI * m_alpha_x * m_alpha_y * cos_theta_2 * cos_theta_2 * e * e);
   }
 }
 
@@ -74,7 +105,11 @@ float TrowbridgeReitzDistribution::Lambda(const Vector3f &w) const {
     float alpha_tan_theta_2 = m_alpha_x * m_alpha_y * tan_theta_2;
     return (-1 + std::sqrt(1.f + alpha_tan_theta_2)) / 2;
   } else {
-    return 0.f;
+    float cos_phi = get_cos_phi(w);
+    float cos_phi_2 = cos_phi * cos_phi;
+    float sin_phi_2 = 1 - cos_phi_2;
+    float alpha_2 = cos_phi_2 * m_alpha_x * m_alpha_x + sin_phi_2 * m_alpha_y * m_alpha_y;
+    return (-1 + std::sqrt(1.f + alpha_2 * tan_theta_2)) / 2;
   }
 }
 

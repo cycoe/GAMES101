@@ -91,6 +91,15 @@ public:
     bool hasEmit(){
         return m->hasEmission();
     }
+
+    virtual void get_local_coords(Vector3f const& p, Vector3f const& z, Vector3f& x, Vector3f& y) const override {
+        if (z.y > 0.999f) {
+            x = Vector3f(1, 0, 0);
+            y = Vector3f(0, 0, 1);
+        }
+        x = Vector3f(-z.z, 0.f, z.x);
+        y = crossProduct(z, x);
+    }
 };
 
 

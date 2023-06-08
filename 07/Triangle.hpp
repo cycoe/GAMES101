@@ -117,15 +117,7 @@ public:
                                     -mesh.Vertices[i + j].Position.Z);
                     vert = 1000.f * vert + Vector3f(180.f, 130.f, 170.f);
                 }
-                else if (filename.find("lucy1") != filename.npos)
-                {
-                    vert = Vector3f(mesh.Vertices[i + j].Position.X,
-                                    mesh.Vertices[i + j].Position.Z,
-                                    -mesh.Vertices[i + j].Position.Y);
-                    vert = 0.25 * vert;
-                    vert = vert + Vector3f(250.f, 150.f, 150.f);
-                }
-                else if (filename.find("lucy2") != filename.npos)
+                else if (filename.find("lucy") != filename.npos)
                 {
                     vert = Vector3f(mesh.Vertices[i + j].Position.X,
                                     mesh.Vertices[i + j].Position.Z,
@@ -133,13 +125,13 @@ public:
                     vert = 0.25 * vert;
                     vert = vert + Vector3f(100.f, 150.f, 300.f);
                 }
-                else if (filename.find("lucy3") != filename.npos)
+                else if (filename.find("teapot") != filename.npos)
                 {
                     vert = Vector3f(mesh.Vertices[i + j].Position.X,
-                                    mesh.Vertices[i + j].Position.Z,
-                                    -mesh.Vertices[i + j].Position.Y);
-                    vert = 0.25 * vert;
-                    vert = vert + Vector3f(-50.f, 150.f, 150.f);
+                                    mesh.Vertices[i + j].Position.Y,
+                                    mesh.Vertices[i + j].Position.Z);
+                    vert = 50 * vert;
+                    vert = vert + Vector3f(260.f, 0.f, 300.f);
                 }
                 else if (filename.find("dragon") != filename.npos)
                 {
@@ -248,6 +240,15 @@ public:
     }
     bool hasEmit(){
         return m->hasEmission();
+    }
+
+    virtual void get_local_coords(Vector3f const& p, Vector3f const& z, Vector3f& x, Vector3f& y) const override {
+        if (z.y > 0.999f) {
+            x = Vector3f(1, 0, 0);
+            y = Vector3f(0, 0, 1);
+        }
+        x = Vector3f(-z.z, 0.f, z.x);
+        y = crossProduct(z, x);
     }
 
     Bounds3 bounding_box;

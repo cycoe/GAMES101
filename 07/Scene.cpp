@@ -72,17 +72,7 @@ Vector3f Scene::shade(Intersection& hit_obj, Vector3f wo, int depth) const
 
     Vector3f x, y;
     Vector3f z = hit_obj.normal;
-    if (std::fabs(z.x) > std::fabs(z.y)){
-        float invLen = 1.0f / std::sqrt(z.x * z.x + z.z * z.z);
-        x = Vector3f(z.z * invLen, 0.0f, -z.x *invLen);
-        y = crossProduct(z, x);
-    }
-    else {
-        float invLen = 1.0f / std::sqrt(z.y * z.y + z.z * z.z);
-        y = Vector3f(0.0f, z.z * invLen, -z.y *invLen);
-        x = crossProduct(y, z);
-    }
-
+    hit_obj.obj->get_local_coords(hit_obj.coords, z, x, y);
     Vector3f local_wo = world_to_local(wo, x, y, z);
 
     const float epsilon = 0.0005f;

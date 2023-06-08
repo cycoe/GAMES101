@@ -25,6 +25,18 @@ public:
     virtual float getArea()=0;
     virtual void Sample(Intersection &pos, float &pdf)=0;
     virtual bool hasEmit()=0;
+    virtual void get_local_coords(Vector3f const& p, Vector3f const& z, Vector3f& x, Vector3f& y) const {
+        if (std::fabs(z.x) > std::fabs(z.y)){
+            float invLen = 1.0f / std::sqrt(z.x * z.x + z.z * z.z);
+            x = Vector3f(z.z * invLen, 0.0f, -z.x *invLen);
+            y = crossProduct(z, x);
+        }
+        else {
+            float invLen = 1.0f / std::sqrt(z.y * z.y + z.z * z.z);
+            y = Vector3f(0.0f, z.z * invLen, -z.y *invLen);
+            x = crossProduct(y, z);
+        }
+    }
 };
 
 

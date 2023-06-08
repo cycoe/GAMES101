@@ -206,89 +206,81 @@ float Material::pdf(const Vector3f &wi, const Vector3f &wo){
 
 Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo){
   switch(m_type){
-  case DIFFUSE:
-    {
-      // calculate the contribution of diffuse   model
-      if (wo.z > 0.0f) {
-        Vector3f diffuse = Kd / M_PI;
-              return diffuse;
-      }
-            else
-                return Vector3f(0.0f);
-            break;
-        }
-        // case BLOCK:
-        //   {
-        //     // calculate the contribution of diffuse   model
-        //     float cosalpha = dotProduct(N, wo);
-        //     if (cosalpha > 0.0f) {
-        //         Vector3f diffuse = Kd / M_PI;
-        //         if (coords.y < 0.001 &&
-        //             (coords.x - (int)(coords.x / 22) * 22 > 20.f ||
-        //              coords.z - (int)(coords.z / 22) * 22 > 20.f))
-        //           diffuse = 0.1 * diffuse;
-        //         return diffuse;
-        //     }
-        //     else
-        //         return Vector3f(0.0f);
-        //     break;
-        // }
-        case SPECULAR:
-        {
-          Vector3f wr(-wi.x, -wi.y, wi.z);
-          return dotProduct(wr, wo) > 0.999f ? Ks : Vector3f(0.f);
-        }
-      //   case GLASS:
-      //   {
-      //     float ior = 1.5f;
-      //     Vector3f wr = reflect(-wo, N);
-      //     Vector3f wt = refract(-wo, N, ior);
-      //     float kr = 0.f;
-      //     fresnel(-wi, N, ior, kr);
+  case DIFFUSE: {
+    // calculate the contribution of diffuse   model
+    if (wo.z > 0.0f) {
+      Vector3f diffuse = Kd / M_PI;
+      return diffuse;
+    } else
+      return Vector3f(0.0f);
+    break;
+  }
+  case BLOCK: {
+    // calculate the contribution of diffuse   model
+    if (wo.z > 0.0f) {
+      Vector3f diffuse = Kd / M_PI;
+      if (coords.y < 0.001 && (coords.x - (int)(coords.x / 22) * 22 > 20.f ||
+                               coords.z - (int)(coords.z / 22) * 22 > 20.f))
+        diffuse = 0.1 * diffuse;
+      return diffuse;
+    } else
+      return Vector3f(0.0f);
+    break;
+  }
+  case SPECULAR: {
+    Vector3f wr(-wi.x, -wi.y, wi.z);
+    return dotProduct(wr, wo) > 0.999f ? Ks : Vector3f(0.f);
+  }
+    //   case GLASS:
+    //   {
+    //     float ior = 1.5f;
+    //     Vector3f wr = reflect(-wo, N);
+    //     Vector3f wt = refract(-wo, N, ior);
+    //     float kr = 0.f;
+    //     fresnel(-wi, N, ior, kr);
 
-      //     if (dotProduct(wi, wr) > 0.99f) {
-      //       return kr * Ks;
-      //     } else if (dotProduct(wi, wt) > 0.99f) {
-      //       return (1 - kr) * Ks;
-      //     } else {
-      //         return Vector3f(0.f);
-      //       }
-      //   }
-    case OREN_NAYAR:
-    {
-      return Vector3f(0.f);
-      //float sigma = 20.f;
-      ////sigma = sigma * M_PI / 180.f;
-      //float sigma2 = sigma * sigma;
-      //float A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
-      //float B = 0.45f * sigma2 / (sigma2 + 0.09f);
+    //     if (dotProduct(wi, wr) > 0.99f) {
+    //       return kr * Ks;
+    //     } else if (dotProduct(wi, wt) > 0.99f) {
+    //       return (1 - kr) * Ks;
+    //     } else {
+    //         return Vector3f(0.f);
+    //       }
+    //   }
+  case OREN_NAYAR: {
+    return Vector3f(0.f);
+    // float sigma = 20.f;
+    ////sigma = sigma * M_PI / 180.f;
+    // float sigma2 = sigma * sigma;
+    // float A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
+    // float B = 0.45f * sigma2 / (sigma2 + 0.09f);
 
-      //float cos_theta_i = dotProduct(wi, N);
-      //float cos_theta_o = dotProduct(wo, N);
-      //float sin_theta_i = std::sqrt(1 - cos_theta_i * cos_theta_i);
-      //float sin_theta_o = std::sqrt(1 - cos_theta_o * cos_theta_o);
+    // float cos_theta_i = dotProduct(wi, N);
+    // float cos_theta_o = dotProduct(wo, N);
+    // float sin_theta_i = std::sqrt(1 - cos_theta_i * cos_theta_i);
+    // float sin_theta_o = std::sqrt(1 - cos_theta_o * cos_theta_o);
 
-      //float max_cos = 0;
-      //if (sin_theta_i > 1e-4 && sin_theta_o > 1e-4) {
-      //  Vector3f phi_i = (wi - cos_theta_i * N).normalized();
-      //  Vector3f phi_o = (wo - cos_theta_o * N).normalized();
-      //  max_cos = std::max(0.f, dotProduct(-phi_i, phi_o));
-      //}
+    // float max_cos = 0;
+    // if (sin_theta_i > 1e-4 && sin_theta_o > 1e-4) {
+    //   Vector3f phi_i = (wi - cos_theta_i * N).normalized();
+    //   Vector3f phi_o = (wo - cos_theta_o * N).normalized();
+    //   max_cos = std::max(0.f, dotProduct(-phi_i, phi_o));
+    // }
 
-      //float sin_alpha, tan_beta;
-      //if (std::abs(cos_theta_i) > std::abs(cos_theta_o)) {
-      //  sin_alpha = sin_theta_o;
-      //  tan_beta = sin_theta_i / std::abs(cos_theta_i);
-      //} else {
-      //  sin_alpha = sin_theta_i;
-      //  tan_beta = sin_theta_o / std::abs(cos_theta_o);
-      //}
+    // float sin_alpha, tan_beta;
+    // if (std::abs(cos_theta_i) > std::abs(cos_theta_o)) {
+    //   sin_alpha = sin_theta_o;
+    //   tan_beta = sin_theta_i / std::abs(cos_theta_i);
+    // } else {
+    //   sin_alpha = sin_theta_i;
+    //   tan_beta = sin_theta_o / std::abs(cos_theta_o);
+    // }
 
-      //return (A + B * max_cos * sin_alpha * tan_beta) / M_PI * Kd;
-    }
-    }
+    // return (A + B * max_cos * sin_alpha * tan_beta) / M_PI * Kd;
+  }
+  }
 
-    return Vector3f(0.0f);
+  return Vector3f(0.0f);
 }
 
 #endif //RAYTRACING_MATERIAL_H
