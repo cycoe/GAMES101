@@ -207,9 +207,9 @@ Vector3f MicrofacetReflection::sample(const Vector3f &wi) {
 float MicrofacetReflection::pdf(const Vector3f &wi, const Vector3f &wo) {
   Vector3f wh = (wi + wo).normalized();
   if (m_sample_visible_area) {
-    return m_distribution.D(wh) * m_distribution.G1(wi) * std::abs(dotProduct(wi, wh)) / std::abs(wi.z);
+    return m_distribution.D(wh) * m_distribution.G1(wi) * std::abs(dotProduct(wi, wh)) / (4 * wi.z * wi.z);
   } else {
-    return m_distribution.D(wh) * std::abs(wh.z);
+    return m_distribution.D(wh) * std::abs(wh.z) / (4 * wi.z);
   }
 }
 
