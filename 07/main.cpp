@@ -40,14 +40,9 @@ int main(int argc, char** argv)
     Material* mf = new Material(OREN_NAYAR, Vector3f(0.0f));
     mf->Kd = Vector3f(0.725f, 0.71f, 0.68f);
     Vector3f R(1.f, 1.f, 1.f);
-    TrowbridgeReitzDistribution td(0.01, 0.3);
-    Material* mfr = new MicrofacetReflection(R, 0.01, 0.3, td, true);
-    Vector3f R2(0.7f, 0.95f, 0.85f);
+    Material* bsdf = new BSDF(R, R, 0.1, 0.1);
+    ///Vector3f R2(0.7f, 0.95f, 0.85f);
     ///Vector3f R2(1.f, 0.84f, 0.f);
-    TrowbridgeReitzDistribution td2(0.2, 0.2);
-    Material* mfr2 = new MicrofacetReflection(R, 0.2, 0.2, td2, true);
-    TrowbridgeReitzDistribution td3(0.3, 0.1);
-    Material* mfr3 = new MicrofacetReflection(R, 0.3, 0.1, td3, true);
 
     MeshTriangle floor("./models/cornellbox/floor.obj", block);
     MeshTriangle wall("./models/cornellbox/wall.obj", white);
@@ -62,10 +57,10 @@ int main(int argc, char** argv)
     //MeshTriangle lucy1("./models/lucy1.obj", mfr);
     //MeshTriangle lucy2("./models/lucy2.obj", mf);
     //MeshTriangle lucy3("./models/lucy3.obj", glass);
-    MeshTriangle dragon("./models/xyzrgb_dragon.obj", mfr2);
-    MeshTriangle teapot("./models/teapot.obj", mfr);
-    Sphere sphere1(Vector3f(350.f, 60.f, 300.f), 60.f, mfr);
-    Sphere sphere2(Vector3f(150.f, 60.f, 300.f), 60.f, mfr3);
+    //MeshTriangle dragon("./models/xyzrgb_dragon.obj", bsdf);
+    MeshTriangle teapot("./models/teapot.obj", bsdf);
+    Sphere sphere1(Vector3f(350.f, 60.f, 300.f), 60.f, bsdf);
+    Sphere sphere2(Vector3f(150.f, 60.f, 300.f), 60.f, mirror);
 
     scene.Add(&floor);
     scene.Add(&wall);
@@ -80,10 +75,10 @@ int main(int argc, char** argv)
     //scene.Add(&bunny);
     //scene.Add(&pane);
     //scene.Add(&spot);
-    //scene.Add(&sphere1);
-    //scene.Add(&sphere2);
+    scene.Add(&sphere1);
+    scene.Add(&sphere2);
     //scene.Add(&dragon);
-    scene.Add(&teapot);
+    //scene.Add(&teapot);
 
     scene.buildBVH();
 

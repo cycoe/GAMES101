@@ -9,6 +9,34 @@
 #include <iostream>
 #include <random>
 
+
+inline Vector3f reflect(const Vector3f &I, const Vector3f &N)
+{
+    return I - 2 * dotProduct(I, N) * N;
+}
+
+inline void fresnel(const Vector3f &I, const Vector3f &N, const float &ior, float &kr)
+{
+    float cosi = clamp(-1, 1, dotProduct(I, N));
+    float etai = 1, etat = ior;
+    if (cosi > 0) {  std::swap(etai, etat); }
+    // Compute sini using Snell's law
+    float sint = etai / etat * sqrtf(std::max(0.f, 1 - cosi * cosi));
+    // Total internal reflection
+    if (sint >= 1) {
+        kr = 1;
+    }
+    else {
+        float cost = sqrtf(std::max(0.f, 1 - sint * sint));
+        cosi = fabsf(cosi);
+        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
+        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
+        kr = (Rs * Rs + Rp * Rp) / 2;
+    }
+    // As a consequence of the conservation of energy, transmittance is given by:
+    // kt = 1 - kr;
+}
+
 inline float get_cos_theta(Vector3f const& w) {
     return w.z;
 }
@@ -36,35 +64,18 @@ inline float get_sin_phi(Vector3f const& w) {
 }
 
 struct TrowbridgeReitzDistribution {
-  TrowbridgeReitzDistribution(float alpha_x, float alpha_y)
-    : m_alpha_x(alpha_x), m_alpha_y(alpha_y) { }
+  TrowbridgeReitzDistribution(float alpha_x, float alpha_y, bool sample_visible_area=true)
+    : m_alpha_x(alpha_x), m_alpha_y(alpha_y), m_sample_visible_area(sample_visible_area) { }
   TrowbridgeReitzDistribution(TrowbridgeReitzDistribution const&) = default;
   inline float D(Vector3f const& wh) const;
   inline float G1(Vector3f const& w) const;
   inline float Lambda(Vector3f const& w) const;
   inline float G(Vector3f const& wo, Vector3f const& wi) const;
+  inline Vector3f Sample_wh(Vector3f const& wo, float r1, float r2) const;
+  inline float Pdf(Vector3f const& wo, Vector3f const& wh) const;
 
   float m_alpha_x;
   float m_alpha_y;
-};
-
-struct MicrofacetReflection : public Material {
-  MicrofacetReflection(Vector3f const &R, float alpha_x, float alpha_y,
-                       TrowbridgeReitzDistribution const &distribute, bool sample_visible_area=true)
-      : m_R(R), m_alpha_x(alpha_x), m_alpha_y(alpha_y),
-        m_distribution(distribute), m_sample_visible_area(sample_visible_area) {}
-  // sample a ray by Material properties
-  virtual Vector3f sample(const Vector3f &wi) override;
-  // given a ray, calculate the PdF of this ray
-  virtual float pdf(const Vector3f &wi, const Vector3f &wo) override;
-  // given a ray, calculate the contribution of this ray
-  virtual Vector3f eval(const Vector3f &coords, const Vector3f &wi, const Vector3f &wo) override;
-  virtual MaterialType getType() override { return GXX; };
-
-  Vector3f m_R;
-  float m_alpha_x;
-  float m_alpha_y;
-  TrowbridgeReitzDistribution m_distribution;
   bool m_sample_visible_area;
 };
 
@@ -180,9 +191,7 @@ inline Vector3f TrowbridgeReitzSample(Vector3f const& wi, float alpha_x, float a
   return Vector3f(-slope_x, -slope_y, 1.f).normalized();
 }
 
-Vector3f MicrofacetReflection::sample(const Vector3f &wi) {
-  float r1 = get_random_float();
-  float r2 = get_random_float();
+Vector3f TrowbridgeReitzDistribution::Sample_wh(const Vector3f &wo, float r1, float r2) const {
   Vector3f wh;
   if (!m_sample_visible_area) {
     float cos_theta = 0.f;
@@ -195,26 +204,44 @@ Vector3f MicrofacetReflection::sample(const Vector3f &wi) {
     }
     float sin_theta = std::sqrt(std::max(0.f, 1 - cos_theta * cos_theta));
     wh = Vector3f(sin_theta * std::cos(phi), sin_theta * std::sin(phi), cos_theta);
-    if (wh.z * wi.z < 0.f) wh = -wh;
+    if (wh.z * wo.z < 0.f) wh = -wh;
   } else {
-    bool flip = wi.z < 0;
-    wh = TrowbridgeReitzSample(flip ? -wi : wi, m_alpha_x, m_alpha_y, r1, r2);
+    bool flip = wo.z < 0;
+    wh = TrowbridgeReitzSample(flip ? -wo : wo, m_alpha_x, m_alpha_y, r1, r2);
     if (flip) wh = -wh;
   }
-  return 2 * dotProduct(wi, wh) * wh - wi;
+  return wh;
 }
 
-float MicrofacetReflection::pdf(const Vector3f &wi, const Vector3f &wo) {
-  Vector3f wh = (wi + wo).normalized();
+float TrowbridgeReitzDistribution::Pdf(const Vector3f &wo, const Vector3f &wh) const {
   if (m_sample_visible_area) {
-    return m_distribution.D(wh) * m_distribution.G1(wi) * std::abs(dotProduct(wi, wh))
-      / (4 * std::abs(wi.z) * dotProduct(wi, wh));
+    return this->D(wh) * this->G1(wo) * std::abs(dotProduct(wo, wh)) / std::abs(wo.z);
   } else {
-    return m_distribution.D(wh) * std::abs(wh.z) / (4 * std::abs(wi.z));
+    return this->D(wh) * std::abs(wh.z);
   }
 }
 
-Vector3f MicrofacetReflection::eval(const Vector3f &coords, const Vector3f &wi, const Vector3f &wo) {
+class BxDF {
+public:
+    virtual Vector3f f(Vector3f const& wo, Vector3f const& wi) const = 0;
+    virtual Vector3f Sample_f(Vector3f const& wo, Vector3f& wi, float r1, float r2, float& pdf) const = 0;
+    virtual float Pdf(Vector3f const& wo, Vector3f const& wi) const = 0;
+};
+
+class MicrofacetReflection : public BxDF {
+public:
+    MicrofacetReflection(Vector3f const& R, TrowbridgeReitzDistribution const& distribution)
+    : m_R(R), m_distribution(distribution) { }
+    inline virtual Vector3f f(Vector3f const& wo, Vector3f const& wi) const override;
+    inline virtual Vector3f Sample_f(Vector3f const& wo, Vector3f& wi, float r1, float r2, float& pdf) const override;
+    inline virtual float Pdf(Vector3f const& wo, Vector3f const& wi) const override;
+
+protected:
+    Vector3f m_R;
+    TrowbridgeReitzDistribution m_distribution;
+};
+
+Vector3f MicrofacetReflection::f(const Vector3f &wo, const Vector3f &wi) const {
   float cos_theta_i = std::abs(wi.z);
   float cos_theta_o = std::abs(wo.z);
   Vector3f wh = wi + wo;
@@ -225,10 +252,125 @@ Vector3f MicrofacetReflection::eval(const Vector3f &coords, const Vector3f &wi, 
   wh = wh.normalized();
   float d = m_distribution.D(wh);
   float g = m_distribution.G(wi, wo);
-  float f = 0.98f;
-  Vector3f R = d * g * f / (4 * cos_theta_i * cos_theta_o) * m_R;
+  float ior = 1.5;
+  float f;
+  fresnel(wi, wh, ior, f);
+  Vector3f R = d * g * 1.f / (4 * cos_theta_i * cos_theta_o) * m_R;
 
   return R;
+}
+
+Vector3f MicrofacetReflection::Sample_f(const Vector3f &wo, Vector3f &wi, float r1, float r2, float &pdf) const {
+    /// sample microfacet orientation wh and reflected direction wi
+    if (wo.z == 0) {
+        pdf = 0.f;
+        return Vector3f(0.f);
+    }
+
+    Vector3f wh = m_distribution.Sample_wh(wo, r1, r2);
+    if (dotProduct(wo, wh) < 0) {
+        pdf = 0.f;
+        return Vector3f(0.f);
+    }
+
+    wi = reflect(-wo, wh);
+    if (wo.z * wi.z < 0) {
+        pdf = 0.f;
+        return Vector3f(0.f);
+    }
+
+    pdf = m_distribution.Pdf(wo, wh) / (4 * dotProduct(wo, wh));
+    return this->f(wo, wi);
+}
+
+float MicrofacetReflection::Pdf(const Vector3f &wo, const Vector3f &wi) const {
+    if (wo.z * wi.z < 0) return 0.f;
+    Vector3f wh = (wo + wi).normalized();
+    return m_distribution.Pdf(wo, wh) / (4 * dotProduct(wo, wh));
+}
+
+class MicrofacetTransmission : public BxDF {
+public:
+    MicrofacetTransmission(Vector3f const& T, TrowbridgeReitzDistribution const& distribution)
+    : m_eta_a(1), m_eta_b(1.5), m_T(T), m_distribution(distribution) { }
+    inline virtual Vector3f f(Vector3f const& wo, Vector3f const& wi) const override;
+
+protected:
+    float m_eta_a;
+    float m_eta_b;
+    Vector3f m_T;
+    TrowbridgeReitzDistribution m_distribution;
+};
+
+Vector3f MicrofacetTransmission::f(const Vector3f &wo, const Vector3f &wi) const {
+  if (wo.z * wi.z > 0) return Vector3f(0.f);
+
+  float cos_theta_i = std::abs(wi.z);
+  float cos_theta_o = std::abs(wo.z);
+  if (cos_theta_i < 0.001f || cos_theta_o <  0.001f) return Vector3f(0.f);
+
+  /// compute wh from wo and wi
+  float eta = cos_theta_o > 0 ? m_eta_b / m_eta_a : m_eta_a / m_eta_b;
+  Vector3f wh = (wo + eta * wi).normalized();
+  if (wh.z < 0) wh = -wh;
+
+  /// same side
+  if (dotProduct(wo, wh) * dotProduct(wi, wh) > 0) return Vector3f(0.f);
+
+  float sqrt_denom = dotProduct(wo, wh) + eta * dotProduct(wi, wh);
+  float factor = true ? 1 / eta : 1;
+  float d = m_distribution.D(wh);
+  float g = m_distribution.G(wi, wo);
+  float ior = 1.5;
+  float kr;
+  fresnel(wi, wh, ior, kr);
+  Vector3f T = (1 - kr) * std::abs(d * g * eta * eta * std::abs(dotProduct(wi, wh)) *
+                std::abs(dotProduct(wo, wh)) * factor * factor /
+                (cos_theta_i * cos_theta_o * sqrt_denom * sqrt_denom));
+
+  return T;
+}
+
+class BSDF : public Material {
+public:
+    inline BSDF(Vector3f const& R, Vector3f const& T, float alpha_x, float alpha_y);
+    inline virtual Vector3f sample(const Vector3f &wi) override;
+    inline virtual float pdf(const Vector3f &wi, const Vector3f &wo) override;
+    inline virtual Vector3f eval(const Vector3f& coords, const Vector3f &wi, const Vector3f &wo) override;
+
+protected:
+    Vector3f m_R;
+    Vector3f m_T;
+    float m_alpha_x;
+    float m_alpha_y;
+    BxDF* m_reflection;
+};
+
+BSDF::BSDF(Vector3f const &R, Vector3f const &T, float alpha_x, float alpha_y)
+    : m_R(R), m_T(T), m_alpha_x(alpha_x), m_alpha_y(alpha_y)
+{
+    TrowbridgeReitzDistribution td(m_alpha_x, m_alpha_y);
+    m_reflection = new MicrofacetReflection(m_R, td);
+}
+
+Vector3f BSDF::sample(const Vector3f &wi) {
+    float r1 = get_random_float();
+    float r2 = get_random_float();
+
+    Vector3f wo;
+    float pdf;
+    (void)m_reflection->Sample_f(wi, wo, r1, r2, pdf);
+    return wo;
+}
+
+float BSDF::pdf(const Vector3f &wi, const Vector3f &wo) {
+    float pdf = m_reflection->Pdf(wi, wo);
+    return pdf;
+}
+
+Vector3f BSDF::eval(const Vector3f &coords, const Vector3f &wi, const Vector3f &wo) {
+    Vector3f R = m_reflection->f(wo, wi);
+    return R;
 }
 
 #endif  // __RAY_TRAING_MICROFACET_HPP__
