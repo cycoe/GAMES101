@@ -23,8 +23,8 @@ void render_thread(std::vector<Vector3f>& fbuffer, const Scene& scene,int spp, i
 	float imageAspectRatio = scene.width / (float)scene.height;
 	//Vector3f eye_pos(278, 273, -800);
 	Vector3f eye_pos(278, 500, -400);
-	Vector3f front = Vector3f(0, -500, 900).normalized();
-	Vector3f up = Vector3f(0, 900, 500).normalized();
+	Vector3f front = Vector3f(0, -550, 900).normalized();
+	Vector3f up = Vector3f(0, 900, 550).normalized();
 	Vector3f right = crossProduct(front, up);
     float r = 10.f;
     float fl = 782.f;
@@ -77,6 +77,7 @@ void Renderer::Render(const Scene& scene,int spp)
     {
 	std::cout << "current _spp: " << _spp << std::endl;
 	int numThreads = std::thread::hardware_concurrency();
+	//numThreads = 1;
 	int lines = scene.height / numThreads + 1;
 	std::vector<std::thread> wokers;
 	for (int i = 0; i < numThreads; i++)

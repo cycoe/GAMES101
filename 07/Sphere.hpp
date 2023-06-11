@@ -96,9 +96,10 @@ public:
         if (z.y > 0.999f) {
             x = Vector3f(1, 0, 0);
             y = Vector3f(0, 0, 1);
+        } else {
+            x = Vector3f(-z.z, 0.f, z.x);
+            y = crossProduct(z, x);
         }
-        x = Vector3f(-z.z, 0.f, z.x);
-        y = crossProduct(z, x);
     }
 };
 
