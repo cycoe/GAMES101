@@ -199,7 +199,7 @@ float Material::pdf(const Vector3f &wi, const Vector3f &wo){
   }
   case SPECULAR: {
     Vector3f wr(-wi.x, -wi.y, wi.z);
-    return dotProduct(wr, wo) > 0.999f ? 1.f : 0.f;
+    return dotProduct(wr, wo) > 0.99f ? 1.f : 0.f;
   }
   }
 }
@@ -229,7 +229,7 @@ Vector3f Material::eval(const Vector3f& coords, const Vector3f &wi, const Vector
   }
   case SPECULAR: {
     Vector3f wr(-wi.x, -wi.y, wi.z);
-    return dotProduct(wr, wo) > 0.999f ? Ks : Vector3f(0.f);
+    return dotProduct(wr, wo) > 0.99f ? Ks : Vector3f(0.f);
   }
     //   case GLASS:
     //   {
