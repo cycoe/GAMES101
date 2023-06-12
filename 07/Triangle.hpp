@@ -247,7 +247,7 @@ public:
             x = Vector3f(1, 0, 0);
             y = Vector3f(0, 0, 1);
         }
-        x = Vector3f(-z.z, 0.f, z.x);
+        x = Vector3f(-z.z, 0.f, z.x).normalized();
         y = crossProduct(z, x);
     }
 
