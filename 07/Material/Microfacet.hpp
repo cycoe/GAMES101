@@ -15,26 +15,40 @@ inline Vector3f reflect(const Vector3f &I, const Vector3f &N)
     return I - 2 * dotProduct(I, N) * N;
 }
 
-inline void fresnel(const Vector3f &I, const Vector3f &N, const float &ior, float &kr)
-{
-    float cosi = clamp(-1, 1, dotProduct(I, N));
-    float etai = 1, etat = ior;
-    if (cosi > 0) {  std::swap(etai, etat); }
-    // Compute sini using Snell's law
-    float sint = etai / etat * sqrtf(std::max(0.f, 1 - cosi * cosi));
-    // Total internal reflection
-    if (sint >= 1) {
-        kr = 1;
+inline bool refract(const Vector3f &wi, const Vector3f &n, float eta, Vector3f& wt) {
+    // Compute $\cos \theta_\roman{t}$ using Snell's law
+    float cosThetaI = dotProduct(n, wi);
+    float sin2ThetaI = std::max(0.f, 1 - cosThetaI * cosThetaI);
+    float sin2ThetaT = eta * eta * sin2ThetaI;
+
+    // Handle total internal reflection for transmission
+    if (sin2ThetaT >= 1) return false;
+    float cosThetaT = std::sqrt(1 - sin2ThetaT);
+    wt = eta * -wi + (eta * cosThetaI - cosThetaT) * n;
+    return true;
+}
+
+inline float FrDielectric(float cosThetaI, float etaI, float etaT) {
+    cosThetaI = clamp(-1, 1, cosThetaI);
+    // Potentially swap indices of refraction
+    bool entering = cosThetaI > 0.f;
+    if (!entering) {
+        std::swap(etaI, etaT);
+        cosThetaI = std::abs(cosThetaI);
     }
-    else {
-        float cost = sqrtf(std::max(0.f, 1 - sint * sint));
-        cosi = fabsf(cosi);
-        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
-        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
-        kr = (Rs * Rs + Rp * Rp) / 2;
-    }
-    // As a consequence of the conservation of energy, transmittance is given by:
-    // kt = 1 - kr;
+
+    // Compute _cosThetaT_ using Snell's law
+    float sinThetaI = std::sqrt(std::max(0.f, 1 - cosThetaI * cosThetaI));
+    float sinThetaT = etaI / etaT * sinThetaI;
+
+    // Handle total internal reflection
+    if (sinThetaT >= 1) return 1;
+    float cosThetaT = std::sqrt(std::max(0.f, 1 - sinThetaT * sinThetaT));
+    float Rparl = ((etaT * cosThetaI) - (etaI * cosThetaT)) /
+                  ((etaT * cosThetaI) + (etaI * cosThetaT));
+    float Rperp = ((etaI * cosThetaI) - (etaT * cosThetaT)) /
+                  ((etaI * cosThetaI) + (etaT * cosThetaT));
+    return (Rparl * Rparl + Rperp * Rperp) / 2;
 }
 
 inline float get_cos_theta(Vector3f const& w) {
@@ -223,8 +237,9 @@ float TrowbridgeReitzDistribution::Pdf(const Vector3f &wo, const Vector3f &wh) c
 
 class BxDF {
 public:
+    virtual Vector3f Sample_wh(Vector3f const& wo, float r1, float r2) const = 0;
     virtual Vector3f f(Vector3f const& wo, Vector3f const& wi) const = 0;
-    virtual Vector3f Sample_f(Vector3f const& wo, Vector3f& wi, float r1, float r2, float& pdf) const = 0;
+    virtual Vector3f Sample_f(Vector3f const& wo, Vector3f const& wh, Vector3f& wi, float& pdf) const = 0;
     virtual float Pdf(Vector3f const& wo, Vector3f const& wi) const = 0;
 };
 
@@ -232,14 +247,19 @@ class MicrofacetReflection : public BxDF {
 public:
     MicrofacetReflection(Vector3f const& R, TrowbridgeReitzDistribution const& distribution)
     : m_R(R), m_distribution(distribution) { }
+    inline virtual Vector3f Sample_wh(Vector3f const& wo, float r1, float r2) const override;
     inline virtual Vector3f f(Vector3f const& wo, Vector3f const& wi) const override;
-    inline virtual Vector3f Sample_f(Vector3f const& wo, Vector3f& wi, float r1, float r2, float& pdf) const override;
+    inline virtual Vector3f Sample_f(Vector3f const& wo, Vector3f const& wh, Vector3f& wi, float& pdf) const override;
     inline virtual float Pdf(Vector3f const& wo, Vector3f const& wi) const override;
 
 protected:
     Vector3f m_R;
     TrowbridgeReitzDistribution m_distribution;
 };
+
+Vector3f MicrofacetReflection::Sample_wh(Vector3f const& wo, float r1, float r2) const {
+  return m_distribution.Sample_wh(wo, r1, r2);
+}
 
 Vector3f MicrofacetReflection::f(const Vector3f &wo, const Vector3f &wi) const {
   float cos_theta_i = std::abs(wi.z);
@@ -252,22 +272,22 @@ Vector3f MicrofacetReflection::f(const Vector3f &wo, const Vector3f &wi) const {
   wh = wh.normalized();
   float d = m_distribution.D(wh);
   float g = m_distribution.G(wi, wo);
-  float ior = 1.5;
-  float f;
-  fresnel(wi, wh, ior, f);
-  Vector3f R = d * g * 1.f / (4 * cos_theta_i * cos_theta_o) * m_R;
+  if (wh.z < 0) wh = -wh;
+  float m_eta_a = 1.f;
+  float m_eta_b = 1.5f;
+  float f = FrDielectric(dotProduct(wo, wh), m_eta_a, m_eta_b);
+  Vector3f R = d * g * f / (4 * cos_theta_i * cos_theta_o) * m_R;
 
   return R;
 }
 
-Vector3f MicrofacetReflection::Sample_f(const Vector3f &wo, Vector3f &wi, float r1, float r2, float &pdf) const {
+Vector3f MicrofacetReflection::Sample_f(Vector3f const& wo, Vector3f const& wh, Vector3f& wi, float& pdf) const {
     /// sample microfacet orientation wh and reflected direction wi
     if (wo.z == 0) {
         pdf = 0.f;
         return Vector3f(0.f);
     }
 
-    Vector3f wh = m_distribution.Sample_wh(wo, r1, r2);
     if (dotProduct(wo, wh) < 0) {
         pdf = 0.f;
         return Vector3f(0.f);
@@ -293,7 +313,10 @@ class MicrofacetTransmission : public BxDF {
 public:
     MicrofacetTransmission(Vector3f const& T, TrowbridgeReitzDistribution const& distribution)
     : m_eta_a(1), m_eta_b(1.5), m_T(T), m_distribution(distribution) { }
+    inline virtual Vector3f Sample_wh(Vector3f const& wo, float r1, float r2) const override;
     inline virtual Vector3f f(Vector3f const& wo, Vector3f const& wi) const override;
+    inline virtual Vector3f Sample_f(Vector3f const& wo, Vector3f const& wh, Vector3f& wi, float& pdf) const override;
+    inline virtual float Pdf(Vector3f const& wo, Vector3f const& wi) const override;
 
 protected:
     float m_eta_a;
@@ -302,12 +325,16 @@ protected:
     TrowbridgeReitzDistribution m_distribution;
 };
 
+Vector3f MicrofacetTransmission::Sample_wh(Vector3f const& wo, float r1, float r2) const {
+  return m_distribution.Sample_wh(wo, r1, r2);
+}
+
 Vector3f MicrofacetTransmission::f(const Vector3f &wo, const Vector3f &wi) const {
   if (wo.z * wi.z > 0) return Vector3f(0.f);
 
-  float cos_theta_i = std::abs(wi.z);
-  float cos_theta_o = std::abs(wo.z);
-  if (cos_theta_i < 0.001f || cos_theta_o <  0.001f) return Vector3f(0.f);
+  float cos_theta_i = wi.z;
+  float cos_theta_o = wo.z;
+  if (std::abs(cos_theta_i) < 0.001f || std::abs(cos_theta_o) <  0.001f) return Vector3f(0.f);
 
   /// compute wh from wo and wi
   float eta = cos_theta_o > 0 ? m_eta_b / m_eta_a : m_eta_a / m_eta_b;
@@ -321,14 +348,45 @@ Vector3f MicrofacetTransmission::f(const Vector3f &wo, const Vector3f &wi) const
   float factor = true ? 1 / eta : 1;
   float d = m_distribution.D(wh);
   float g = m_distribution.G(wi, wo);
-  float ior = 1.5;
-  float kr;
-  fresnel(wi, wh, ior, kr);
-  Vector3f T = (1 - kr) * std::abs(d * g * eta * eta * std::abs(dotProduct(wi, wh)) *
+  float f = FrDielectric(dotProduct(wo, wh), m_eta_a, m_eta_b);
+  Vector3f T = (1 - f) * std::abs(d * g * eta * eta * std::abs(dotProduct(wi, wh)) *
                 std::abs(dotProduct(wo, wh)) * factor * factor /
-                (cos_theta_i * cos_theta_o * sqrt_denom * sqrt_denom));
+                (cos_theta_i * cos_theta_o * sqrt_denom * sqrt_denom)) * m_T;
 
   return T;
+}
+
+Vector3f MicrofacetTransmission::Sample_f(Vector3f const& wo, Vector3f const& wh, Vector3f& wi, float& pdf) const {
+    /// sample microfacet orientation wh and reflected direction wi
+    if (wo.z == 0) {
+        pdf = 0.f;
+        return Vector3f(0.f);
+    }
+
+    if (dotProduct(wo, wh) < 0) {
+        pdf = 0.f;
+        return Vector3f(0.f);
+    }
+
+    float eta = wo.z > 0 ? m_eta_a / m_eta_b : m_eta_b / m_eta_a;
+    if (!refract(wo, wh, eta, wi)) {
+        pdf = 0.f;
+        return Vector3f(0.f);
+    }
+    pdf = this->Pdf(wo, wi);
+    return this->f(wo, wi);
+}
+
+float MicrofacetTransmission::Pdf(const Vector3f &wo, const Vector3f &wi) const {
+    if (wo.z * wi.z > 0) return 0.f;
+    float eta = wo.z > 0 ? m_eta_b / m_eta_a : m_eta_a / m_eta_b;
+    Vector3f wh = (wo + eta * wi).normalized();
+
+    if (dotProduct(wo, wh) * dotProduct(wi, wh) > 0) return 0.f;
+
+    float sqrt_denom = dotProduct(wo, wh) + eta * dotProduct(wi, wh);
+    float dwh_dwi = std::abs(eta * eta * dotProduct(wi, wh) / (sqrt_denom * sqrt_denom));
+    return m_distribution.Pdf(wo, wh) * dwh_dwi;
 }
 
 class BSDF : public Material {
@@ -344,6 +402,7 @@ protected:
     float m_alpha_x;
     float m_alpha_y;
     BxDF* m_reflection;
+    BxDF* m_transmission;
 };
 
 BSDF::BSDF(Vector3f const &R, Vector3f const &T, float alpha_x, float alpha_y)
@@ -351,26 +410,53 @@ BSDF::BSDF(Vector3f const &R, Vector3f const &T, float alpha_x, float alpha_y)
 {
     TrowbridgeReitzDistribution td(m_alpha_x, m_alpha_y);
     m_reflection = new MicrofacetReflection(m_R, td);
+    m_transmission = new MicrofacetTransmission(m_T, td);
 }
 
 Vector3f BSDF::sample(const Vector3f &wi) {
     float r1 = get_random_float();
     float r2 = get_random_float();
+    float rt = get_random_float();
 
+    Vector3f wh = m_reflection->Sample_wh(wi, r1, r2);
+    float m_eta_a = 1.f;
+    float m_eta_b = 1.5f;
+    float f = FrDielectric(dotProduct(wi, wh), m_eta_a, m_eta_b);
     Vector3f wo;
     float pdf;
-    (void)m_reflection->Sample_f(wi, wo, r1, r2, pdf);
+    if (rt < f) {
+      (void)m_reflection->Sample_f(wi, wh, wo, pdf);
+    } else {
+      (void)m_transmission->Sample_f(wi, wh, wo, pdf);
+    }
     return wo;
 }
 
 float BSDF::pdf(const Vector3f &wi, const Vector3f &wo) {
-    float pdf = m_reflection->Pdf(wi, wo);
-    return pdf;
+    float m_eta_a = 1.f;
+    float m_eta_b = 1.5f;
+    Vector3f wh;
+    if (wi.z * wo.z > 0) {
+      wh = (wi + wo).normalized();
+    } else {
+      float eta = wo.z > 0 ? m_eta_b / m_eta_a : m_eta_a / m_eta_b;
+      wh = (wo + eta * wi).normalized();
+    }
+    if (wh.z < 0) wh = -wh;
+    float f = FrDielectric(dotProduct(wi, wh), m_eta_a, m_eta_b);
+    if (wi.z * wo.z > 0) {
+      return m_reflection->Pdf(wi, wo) * f;
+    } else {
+      return m_transmission->Pdf(wi, wo) * (1 - f);
+    }
 }
 
 Vector3f BSDF::eval(const Vector3f &coords, const Vector3f &wi, const Vector3f &wo) {
-    Vector3f R = m_reflection->f(wo, wi);
-    return R;
+    if (wi.z * wo.z > 0) {
+      return m_reflection->f(wo, wi);
+    } else {
+      return m_transmission->f(wo, wi);
+    }
 }
 
 #endif  // __RAY_TRAING_MICROFACET_HPP__

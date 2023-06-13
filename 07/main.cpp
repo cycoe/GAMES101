@@ -16,7 +16,7 @@ int main(int argc, char** argv)
 {
 
     // Change the definition here to change resolution
-    Scene scene(784, 784);
+    Scene scene(784, 480);
 
     Material* red = new Material(DIFFUSE, Vector3f(0.0f));
     red->Kd = Vector3f(0.63f, 0.065f, 0.05f);
@@ -57,8 +57,8 @@ int main(int argc, char** argv)
     //MeshTriangle lucy1("./models/lucy1.obj", mfr);
     //MeshTriangle lucy2("./models/lucy2.obj", mf);
     //MeshTriangle lucy3("./models/lucy3.obj", glass);
-    //MeshTriangle dragon("./models/xyzrgb_dragon.obj", bsdf);
-    MeshTriangle teapot("./models/teapot.obj", bsdf);
+    MeshTriangle dragon("./models/xyzrgb_dragon.obj", bsdf);
+    //MeshTriangle teapot("./models/teapot.obj", bsdf);
     Sphere sphere1(Vector3f(350.f, 60.f, 300.f), 60.f, bsdf);
     Sphere sphere2(Vector3f(150.f, 60.f, 300.f), 60.f, mirror);
 
@@ -75,9 +75,9 @@ int main(int argc, char** argv)
     //scene.Add(&bunny);
     //scene.Add(&pane);
     //scene.Add(&spot);
-    scene.Add(&sphere1);
-    scene.Add(&sphere2);
-    //scene.Add(&dragon);
+    //scene.Add(&sphere1);
+    //scene.Add(&sphere2);
+    scene.Add(&dragon);
     //scene.Add(&teapot);
 
     scene.buildBVH();

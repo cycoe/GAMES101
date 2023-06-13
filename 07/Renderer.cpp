@@ -23,11 +23,11 @@ void render_thread(std::vector<Vector3f>& fbuffer, const Scene& scene,int spp, i
 	float imageAspectRatio = scene.width / (float)scene.height;
 	//Vector3f eye_pos(278, 273, -800);
 	Vector3f eye_pos(278, 500, -400);
-	Vector3f front = Vector3f(0, -500, 900).normalized();
-	Vector3f up = Vector3f(0, 900, 500).normalized();
+	Vector3f front = Vector3f(0, -520, 900).normalized();
+	Vector3f up = Vector3f(0, 900, 520).normalized();
 	Vector3f right = crossProduct(front, up);
     float r = 10.f;
-    float fl = 782.f;
+    float fl = 806.f;
 	for (int i = y0; i < y1; i++)
 	{
 		for (int j = 0; j < scene.width; j++)

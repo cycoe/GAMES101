@@ -139,7 +139,7 @@ public:
                                     mesh.Vertices[i + j].Position.Y,
                                     mesh.Vertices[i + j].Position.Z);
                     vert = 2 * vert;
-                    vert = vert + Vector3f(250.f, 80.f, 250.f);
+                    vert = vert + Vector3f(250.f, 80.f, 300.f);
                 }
                 else
                 {
